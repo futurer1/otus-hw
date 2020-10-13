@@ -8,7 +8,7 @@ plugins {
 
 idea {
     project {
-        languageLevel = 14
+        languageLevel = JavaVersion.VERSION_15
     }
     module {
         downloadJavadoc = true
