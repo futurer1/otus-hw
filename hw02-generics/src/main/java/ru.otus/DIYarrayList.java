@@ -8,10 +8,10 @@ public class DIYarrayList<T> implements List<T> {
     private int size;
     private T[] myArray;
 
-    DIYarrayList() {
+    public DIYarrayList() {
     }
 
-    DIYarrayList(int newSize) {
+    public DIYarrayList(int newSize) {
         myArray = (T[]) new Object[newSize];
         size = newSize;
     }
@@ -35,7 +35,7 @@ public class DIYarrayList<T> implements List<T> {
             return;
         }
         if (size == myArray.length) {
-            T[] newArray = (T[]) new Object[BUCKET + myArray.length];
+            T[] newArray = (T[]) new Object[myArray.length + BUCKET];
             for (int i = 0; i < myArray.length; i++) {
                 newArray[i] = myArray[i];
             }
