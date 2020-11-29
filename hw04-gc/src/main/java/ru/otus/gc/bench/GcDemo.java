@@ -50,26 +50,73 @@ http://openjdk.java.net/jeps/158
 */
 
 public class GcDemo {
-    public static void main(String... args) throws Exception {
+
+    private static int countYoung = 0;
+    private static int countOld = 0;
+    private static int timeYoung = 0;
+    private static int timeOld = 0;
+
+    public static void main(String... agrs) throws Exception {
+
+        var obj = new GcDemo();
+
+        // G1 Garbage Collector
+        // 1. obj.run(10000, 100000, 0, "Young", "Old");
+        // -Xms512m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=10
+
+        // 2. obj.run(10000, 100000, 10, "Young", "Old");
+        // -Xms512m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=10
+
+        // 3. obj.run(10000, 100000, 100, "Young", "Old");
+        // -Xms512m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=10
+
+        // 4. obj.run(10000, 100000, 100, "Young", "Old");
+        // -Xms512m -Xmx512m -XX:+UseG1GC -XX:MaxGCPauseMillis=100
+
+        // 5. obj.run(10000, 100000, 0, "Young", "Old");
+        // -Xms4096m -Xmx4096m -XX:+UseG1GC -XX:MaxGCPauseMillis=10
+
+        // 6. obj.run(10000, 100000, 10, "Young", "Old");
+        // -Xms4096m -Xmx4096m -XX:+UseG1GC -XX:MaxGCPauseMillis=10
+
+
+        // Parallel Garbage Collector
+        // 1. obj.run(10000, 100000, 0, "Scavenge", "MarkSweep");
+        // -Xms512m<br> -Xmx512m<br> -XX:+UseParallelGC<br> -XX:MaxGCPauseMillis=10
+
+        // 2. obj.run(10000, 100000, 10, "Scavenge", "MarkSweep");
+        // -Xms512m<br> -Xmx512m<br> -XX:+UseParallelGC<br> -XX:MaxGCPauseMillis=10
+
+        // 3. obj.run(10000, 100000, 100, "Scavenge", "MarkSweep");
+        // -Xms512m<br> -Xmx512m<br> -XX:+UseParallelGC<br> -XX:MaxGCPauseMillis=10
+
+        // 4. obj.run(10000, 100000, 100, "Scavenge", "MarkSweep");
+        // -Xms512m<br> -Xmx512m<br> -XX:+UseParallelGC<br> -XX:MaxGCPauseMillis=100
+
+        // 5. obj.run(10000, 100000, 0, "Scavenge", "MarkSweep");
+        // -Xms4096m -Xmx4096m -XX:+UseParallelGC -XX:MaxGCPauseMillis=10
+
+        // 6. obj.run(10000, 100000, 10, "Scavenge", "MarkSweep");
+        // -Xms4096m -Xmx4096m -XX:+UseParallelGC -XX:MaxGCPauseMillis=10
+    }
+
+    public void run(int sizeBatch, int loopCount, int sleepMillis, String youngAttribute, String oldAttribute) throws Exception {
         System.out.println("Starting pid: " + ManagementFactory.getRuntimeMXBean().getName());
-        switchOnMonitoring();
+        switchOnMonitoring(youngAttribute, oldAttribute);
         long beginTime = System.currentTimeMillis();
 
-        int size = 5 * 1000 * 1000;
-        int loopCounter = 1000;
-        //int loopCounter = 100000;
         MBeanServer mbs = ManagementFactory.getPlatformMBeanServer();
         ObjectName name = new ObjectName("ru.otus:type=Benchmark");
 
-        ru.otus.gc.bench.Benchmark mbean = new ru.otus.gc.bench.Benchmark(loopCounter);
+        ru.otus.gc.bench.Benchmark mbean = new ru.otus.gc.bench.Benchmark(loopCount, sleepMillis);
         mbs.registerMBean(mbean, name);
-        mbean.setSize(size);
+        mbean.setSize(sizeBatch);
         mbean.run();
 
         System.out.println("time:" + (System.currentTimeMillis() - beginTime) / 1000);
     }
 
-    private static void switchOnMonitoring() {
+    private static void switchOnMonitoring(String youngAttribute, String oldAttribute) {
         List<GarbageCollectorMXBean> gcbeans = ManagementFactory.getGarbageCollectorMXBeans();
         for (GarbageCollectorMXBean gcbean : gcbeans) {
             System.out.println("GC name:" + gcbean.getName());
@@ -85,7 +132,16 @@ public class GcDemo {
                     long duration = info.getGcInfo().getDuration();
 
                     System.out.println("start:" + startTime + " Name:" + gcName + ", action:" + gcAction + ", gcCause:" + gcCause + "(" + duration + " ms)");
-                    //System.out.println(gcName +  " (" + duration + " ms)");
+
+                    if (gcName.contains(youngAttribute)) {
+                        countYoung++;
+                        timeYoung += duration;
+                    }
+                    if (gcName.contains(oldAttribute)) {
+                        countOld++;
+                        timeOld += duration;
+                    }
+                    System.out.println("Young - " + countYoung + " ( " + timeYoung + " ms); Old - " + countOld + " (" + timeOld + " ms)");
                 }
             };
             emitter.addNotificationListener(listener, null, null);
