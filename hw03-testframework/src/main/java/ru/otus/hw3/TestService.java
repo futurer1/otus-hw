@@ -8,28 +8,37 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.lang.Object;
+import java.util.List;
 
 public class TestService {
 
     // массивы для сохранения названий методов
-    private final ArrayList<String> beforeMethods = new ArrayList<>();
-    private final ArrayList<String> testMethods = new ArrayList<>();
-    private final ArrayList<String> afterMethods = new ArrayList<>();
+    private final List<Method> beforeMethods = new ArrayList<>();
+    private final List<Method> testMethods = new ArrayList<>();
+    private final List<Method> afterMethods = new ArrayList<>();
 
-    private int success = 0;
-    private int fail = 0;
+    private int countSuccess = 0;
+    private int countFail = 0;
 
-    public void execute (Class<?> testClass) throws Exception
+    private final int SUCCESS = 1;
+    private final int FAIL = 0;
+    private final int UNKNOWN_RESULT = -1;
+
+    private int getSuccessIfNotTotalFail(int result) {
+        return (result != FAIL) ? SUCCESS : FAIL;
+    }
+
+    public void execute (Class<?> testClass)
     {
         System.out.println("Test class name: " + testClass.getSimpleName());
         readClass(testClass);
-        runMethods(testClass);
+        runAllMethods(testClass);
     }
 
-    private void saveTestResult(Integer result)
+    private void saveTestResult(int result)
     {
-        success += result == 1 ? 1 : 0;
-        fail += result == 0 ? 1 : 0;
+        countSuccess += result == SUCCESS ? 1 : 0;
+        countFail += result == FAIL ? 1 : 0;
     }
 
     /**
@@ -51,88 +60,76 @@ public class TestService {
             //Arrays.stream(annotations).forEach(annotation -> System.out.println(annotation.toString()));
 
             if (methodsPublic[i].isAnnotationPresent(Before.class)) {
-                this.beforeMethods.add(methodsPublic[i].getName());
+                this.beforeMethods.add(methodsPublic[i]);
                 System.out.println(methodsPublic[i].getName() + " - Before");
             }
 
             if (methodsPublic[i].isAnnotationPresent(Test.class)) {
-                this.testMethods.add(methodsPublic[i].getName());
+                this.testMethods.add(methodsPublic[i]);
                 System.out.println(methodsPublic[i].getName() + " - Test");
             }
 
             if (methodsPublic[i].isAnnotationPresent(After.class)) {
-                this.afterMethods.add(methodsPublic[i].getName());
+                this.afterMethods.add(methodsPublic[i]);
                 System.out.println(methodsPublic[i].getName() + " - After");
             }
         }
     }
 
-    private void runMethods(Class<?> testClass) throws Exception
+    private void runAllMethods(Class<?> testClass)
     {
-        Constructor<?> constructor = testClass.getConstructor();
+        try {
+            Constructor<?> constructor = testClass.getConstructor();
+            int testNumber = 0;
 
-        Integer testNumber = 0;
+            // выполняем в нужном порядке методы
+            for (Method testMethod : testMethods) {
+                // новый экземпляр класса
+                Object clazz = constructor.newInstance();
+                System.out.println(" ");
+                System.out.println("Test " + ++testNumber + ". Object hash = " + clazz.hashCode());
+                int testResult = UNKNOWN_RESULT;
 
-        // выполняем в нужном порядке методы
-        for (String testMethod : testMethods) {
-            // новый экземпляр класса
-            Object clazz = constructor.newInstance();
-            System.out.println(" ");
-            System.out.println("Test " + ++testNumber + ". Object hash = " + clazz.hashCode());
-            Integer result = -1;
-
-            for (String beforeMethod : beforeMethods) {
-                System.out.println("Выполняем: " + beforeMethod);
-                try {
-                    callMethod(clazz, beforeMethod);
-                    result = result != 0 ? 1 : 0;
-                } catch (Exception e) {
-                    result = 0;
-                    System.out.println("Исключение в методе: " + beforeMethod);
+                testResult = runMethods(clazz, beforeMethods, testResult);
+                if (testResult == SUCCESS || testResult == UNKNOWN_RESULT) {
+                    List<Method> oneTestMethod = new ArrayList<>();
+                    oneTestMethod.add(testMethod);
+                    testResult = runMethods(clazz, oneTestMethod, testResult);
                 }
+                testResult = runMethods(clazz, afterMethods, testResult);
+                saveTestResult(testResult);
             }
-
-
-            System.out.println("Выполняем: " + testMethod);
-            try {
-                callMethod(clazz, testMethod);
-                result = result != 0 ? 1 : 0;
-            } catch (Exception e) {
-                result = 0;
-                System.out.println("Исключение в методе: " + testMethod);
-            }
-
-
-            for (String afterMethod : afterMethods) {
-                System.out.println("Выполняем: " + afterMethod);
-
-                try {
-                    callMethod(clazz, afterMethod);
-                    result = result != 0 ? 1 : 0;
-                } catch (Exception e) {
-                    result = 0;
-                    System.out.println("Исключение в методе: " + afterMethod);
-                }
-            }
-
-            var mainResult = callMethod(clazz, "getResult");
-            System.out.println("Результат: " + mainResult);
-
-            saveTestResult(result);
+        } catch (Exception e) {
+            System.out.println("Не удалось запустить тестируемые методы класса: " + e.getMessage());
         }
+    }
+
+    private int runMethods(Object clazz, List<Method> methods, int prevResult)
+    {
+        int result = SUCCESS;
+        for (Method method : methods) {
+            System.out.println("Выполняем: " + method.getName());
+            try {
+                callMethod(clazz, method);
+                result = getSuccessIfNotTotalFail(prevResult);
+            } catch (Exception e) {
+                result = FAIL;
+                System.out.println("Исключение в методе: " + method.getName());
+            }
+        }
+        return result;
     }
 
     public void printReport()
     {
         System.out.println(" ");
-        System.out.println("Успешно: " + success);
-        System.out.println("Неуспешно: " + fail);
-        System.out.println("Всего: " + (success + fail));
+        System.out.println("Успешно: " + countSuccess);
+        System.out.println("Неуспешно: " + countFail);
+        System.out.println("Всего: " + (countSuccess + countFail));
     }
 
-    public static Object callMethod(Object object, String name, Object... args) {
+    public static Object callMethod(Object object, Method method, Object... args) {
         try {
-            var method = object.getClass().getDeclaredMethod(name, toClasses(args));
             method.setAccessible(true);
             return method.invoke(object, args);
         } catch (Exception e) {
