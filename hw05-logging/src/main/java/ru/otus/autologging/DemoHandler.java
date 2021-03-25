@@ -9,13 +9,13 @@ import java.util.Set;
 
 public class DemoHandler implements InvocationHandler {
 
-    private final TestLoggingInterface testClass;
+    private final Object testClass;
 
     private final Set<Method> methodsLog = new HashSet<>();
 
-    public DemoHandler(TestLoggingInterface testClass) {
+    public DemoHandler(Object testClass) {
         this.testClass = testClass;
-        for (Method testClassMethod : TestLoggingInterface.class.getMethods()) {
+        for (Method testClassMethod : testClass.getClass().getDeclaredMethods()) {
             if (testClassMethod.getAnnotation(Log.class) != null) {
                 // метод имеет аннотацию Log, добавим его в список логирования
                 methodsLog.add(testClassMethod);
