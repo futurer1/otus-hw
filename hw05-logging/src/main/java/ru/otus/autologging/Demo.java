@@ -1,14 +1,12 @@
 package ru.otus.autologging;
 
-import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
-
 
 public class Demo {
 
     public static void main(String[] args) {
 
-        TestLoggingInterface testClass = createMyClass();
+        TestLoggingInterface testClass = createMyClass(new TestLogging());
 
         int res1 = testClass.calculation(6);
         System.out.println("Result: " + res1);
@@ -23,12 +21,11 @@ public class Demo {
         System.out.println("Result: " + res4);
     }
 
-    private static TestLoggingInterface createMyClass() {
-        InvocationHandler handler = new DemoHandler(new TestLogging());
+    private static TestLoggingInterface createMyClass(TestLoggingInterface obj) {
         return (TestLoggingInterface) Proxy.newProxyInstance(
-                Demo.class.getClassLoader(),
-                new Class<?>[]{TestLoggingInterface.class},
-                handler
+                obj.getClass().getClassLoader(),
+                obj.getClass().getInterfaces(),
+                new DemoHandler(obj)
         );
     }
 }
